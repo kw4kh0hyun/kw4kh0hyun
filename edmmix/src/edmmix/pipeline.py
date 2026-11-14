@@ -14,7 +14,8 @@ from . import analyze, balance, mixbus, params as params_mod, qc, report, stem_p
 from .audioio import dequantize24, quantize24, write_wav24
 from .classify import Classifier, classify_stems
 from .dsp import filters
-from .dsp.util import f64, from_db, rnd
+from .dsp.util import f64, from_db, rnd, to_mono
+from .interaction import masking, mono_bass, phase, sidechain
 from .loader import StemSet
 
 TONAL_ROLES = {"sub", "bass", "lead", "pad", "pluck_arp", "vocal"}
@@ -46,13 +47,23 @@ def check_stems_match(stem_set: StemSet, params: dict) -> None:
 
 
 def process_stem(x: np.ndarray, sr: int, sp: dict) -> tuple[np.ndarray, dict]:
-    """Per-stem chain that depends on nothing but the stem itself (stage 4)."""
-    return stem_processing.apply(x, sr, sp)
+    """Per-stem chain that depends on nothing but the stem itself (stage 4, plus the optional
+    phase correction - polarity and delay commute with the rest of this chain)."""
+    y, info = stem_processing.apply(x, sr, sp)
+    return phase.apply(y, sp["phase"]), info
 
 
 def interact(name: str, procs: dict[str, np.ndarray], params: dict, sr: int) -> tuple[np.ndarray, dict]:
-    """Inter-stem processing for one stem (stage 5)."""
-    return procs[name], {}
+    """Inter-stem processing for one stem (stage 5): side-chain -> dynamic EQ -> bass mono-ing."""
+    sp = params["stems"][name]
+    info: dict = {}
+    y, info["sidechain"] = sidechain.apply(procs[name], sr, params["sidechain"]["onsets_samples"],
+                                           sp["sidechain"], float(params["bpm"]))
+    info["dynamic_eq"] = []
+    for band in sp["dynamic_eq"]:
+        y, band_info = masking.apply_dynamic_eq(y, to_mono(procs[band["source"]]), sr, band)
+        info["dynamic_eq"].append(band_info)
+    return mono_bass.apply(y, sr, params["mono_bass"]), info
 
 
 def apply_bus(x: np.ndarray, bus: dict, sr: int) -> np.ndarray:
@@ -162,6 +173,24 @@ def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path |
         params["stems"][name].update(stem_processing.decide(roles[name], raw, sr, preset))
         procs[name], _ = process_stem(f64(stem_set.get(name).audio), sr, params["stems"][name])
 
+    # --- interaction: kick side-chain and phase check
+    bpm = float(params["bpm"])
+    kick_names = [n for n in sorted(roles) if roles[n] == "kick"]
+    onsets = np.zeros(0, dtype=np.int64)
+    if kick_names:
+        kick_mono = to_mono(sum(procs[n] for n in kick_names))
+        onsets = sidechain.detect_kick_onsets(kick_mono, sr, bpm)
+        params["sidechain"] = {
+            "source_stems": kick_names, "onsets_samples": [int(o) for o in onsets],
+            "reason": f"{len(onsets)} kick transients detected on {', '.join(kick_names)}"}
+        for name in sorted(roles):
+            if roles[name] in ("sub", "bass"):
+                params["stems"][name]["phase"] = phase.analyse(kick_mono, to_mono(procs[name]), sr, onsets)
+    else:
+        params["sidechain"]["reason"] = "no stem with role 'kick'; side-chain and phase check skipped"
+    for name in sorted(roles):
+        params["stems"][name]["sidechain"] = sidechain.decide(roles[name], preset, bpm, len(onsets))
+
     loudness = {}
     for name in sorted(roles):
         value = analyze.integrated_lufs(procs[name], sr)
@@ -169,6 +198,13 @@ def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path |
     for name, decision in balance.decide_gains(loudness, roles, preset).items():
         params["stems"][name]["gain_db"] = decision["gain_db"]
         params["stems"][name]["gain_reason"] = decision["reason"]
+
+    # --- interaction: masking (needs the balance gains) and bass mono-ing
+    sidechained = {n for n in roles if params["stems"][n]["sidechain"]["enabled"]}
+    gains = {n: params["stems"][n]["gain_db"] for n in roles}
+    for name, bands in masking.decide(procs, gains, roles, sidechained, sr).items():
+        params["stems"][name]["dynamic_eq"] = bands
+    params["mono_bass"] = mono_bass.decide()
 
     analysis["reference"] = None
     return params_mod.validate(params), analysis
