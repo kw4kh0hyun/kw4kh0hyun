@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Song DNA</title>
+  <meta name="description" content="음악 링크를 넣으면 BPM·키·분위기·에너지 흐름을 분석해 공유용 카드로 만들어 드려요." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧬</text></svg>" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="logo">🧬</span> Song DNA</div>
+    <p class="tag">링크 하나로 곡의 유전자를 읽어요</p>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>어떤 곡을 분석해 볼까요?</h1>
+      <p class="sub">Spotify · YouTube · Apple Music · Deezer 링크 또는 "아티스트 곡명"을 넣어 주세요.</p>
+
+      <form id="form" class="search" autocomplete="off">
+        <input id="q" type="text" placeholder="https://open.spotify.com/track/…  또는  NewJeans Hype Boy" aria-label="음악 링크 또는 검색어" />
+        <button type="submit" id="go">분석하기</button>
+      </form>
+
+      <div class="examples" id="examples">
+        <span>예시</span>
+        <button type="button">NewJeans Hype Boy</button>
+        <button type="button">IU 좋은 날</button>
+        <button type="button">Daft Punk Get Lucky</button>
+        <button type="button">Billie Eilish bad guy</button>
+      </div>
+
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="audio/*" hidden />
+        <strong>또는 음악 파일을 끌어다 놓기</strong>
+        <span>MP3 · WAV · M4A — 파일은 서버로 올라가지 않고 브라우저 안에서만 분석돼요</span>
+      </label>
+    </section>
+
+    <section id="status" class="status" hidden>
+      <ol class="steps">
+        <li data-step="resolve">곡 찾기</li>
+        <li data-step="audio">음원 받기</li>
+        <li data-step="analyze">오디오 분석</li>
+        <li data-step="render">카드 생성</li>
+      </ol>
+      <p id="statusMsg" class="msg"></p>
+    </section>
+
+    <section id="result" class="result" hidden>
+      <div class="card-col">
+        <canvas id="card" aria-label="Song DNA 카드"></canvas>
+        <div class="actions">
+          <button id="download" class="primary">PNG 저장</button>
+          <button id="share">공유하기</button>
+        </div>
+        <audio id="player" controls preload="none"></audio>
+      </div>
+
+      <div class="panels">
+        <article class="panel">
+          <h2>곡 정보</h2>
+          <dl id="meta" class="meta"></dl>
+          <div id="links" class="links"></div>
+        </article>
+
+        <article class="panel">
+          <h2>핵심 지표</h2>
+          <div id="stats" class="stats"></div>
+        </article>
+
+
+        <article class="panel wide">
+          <h2>인사이트</h2>
+          <ul id="insights" class="insights"></ul>
+        </article>
+        <article class="panel wide">
+          <h2>에너지 흐름 <small id="flowNote"></small></h2>
+          <div id="flow" class="flow"></div>
+        </article>
+        <article class="panel">
+          <h2>사운드 프로필</h2>
+          <div id="features" class="features"></div>
+        </article>
+
+
+        <article class="panel">
+          <h2>음 분포 <small>어떤 음이 많이 쓰였나</small></h2>
+          <div id="chroma" class="chroma"></div>
+        </article>
+
+        <article class="panel">
+          <h2>DJ 믹싱 가이드</h2>
+          <div id="mix" class="mix"></div>
+        </article>
+
+        <article class="panel" id="creditsPanel">
+          <h2>크레딧</h2>
+          <ul id="credits" class="credits"></ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    프로토타입 · 미리듣기(30초) 또는 업로드한 파일을 브라우저에서 직접 분석합니다. 수치는 추정치예요.
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
