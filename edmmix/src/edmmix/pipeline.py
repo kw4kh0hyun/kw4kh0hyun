@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import analyze, balance, mixbus, params as params_mod, qc, report
+from . import analyze, balance, mixbus, params as params_mod, qc, report, stem_processing
 from .audioio import dequantize24, quantize24, write_wav24
 from .classify import Classifier, classify_stems
 from .dsp import filters
@@ -47,7 +47,7 @@ def check_stems_match(stem_set: StemSet, params: dict) -> None:
 
 def process_stem(x: np.ndarray, sr: int, sp: dict) -> tuple[np.ndarray, dict]:
     """Per-stem chain that depends on nothing but the stem itself (stage 4)."""
-    return x, {}
+    return stem_processing.apply(x, sr, sp)
 
 
 def interact(name: str, procs: dict[str, np.ndarray], params: dict, sr: int) -> tuple[np.ndarray, dict]:
@@ -158,6 +158,8 @@ def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path |
 
     procs = {}
     for name in sorted(roles):
+        raw = f64(stem_set.get(name).audio)
+        params["stems"][name].update(stem_processing.decide(roles[name], raw, sr, preset))
         procs[name], _ = process_stem(f64(stem_set.get(name).audio), sr, params["stems"][name])
 
     loudness = {}
