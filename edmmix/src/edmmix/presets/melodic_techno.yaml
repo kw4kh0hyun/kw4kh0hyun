@@ -1,0 +1,34 @@
+# Genre preset: melodic_techno
+name: melodic_techno
+description: "Melodic techno: deep kick/bass foundation, wide pads and arps sit further forward."
+
+# Used for BPM-synced times when tempo detection fails.
+default_bpm: 124
+
+# Target integrated loudness of each role relative to the kick (LU).
+# With several stems sharing a role, the role's *sum* aims at the target.
+targets_lu:
+  kick: 0.0
+  snare_clap: -7.0
+  hats_perc: -10.0
+  sub: -6.0
+  bass: -4.0
+  lead: -6.0
+  pad: -8.0
+  pluck_arp: -7.0
+  vocal: -6.0
+  fx: -12.0
+
+# Kick-triggered ducking. release_beats is in quarter notes (BPM-synced).
+sidechain:
+  attack_ms: 2.0
+  hold_ms: 15.0
+  release_beats: 0.5
+  curve: 2.0
+  # Maximum gain reduction per role (dB); roles not listed are not ducked.
+  depth_db:
+    sub: 8.0
+    bass: 6.0
+    pad: 3.0
+    pluck_arp: 2.0
+    lead: 2.0

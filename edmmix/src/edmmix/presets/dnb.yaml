@@ -1,0 +1,32 @@
+# Genre preset: dnb
+name: dnb
+description: "Drum & bass: snare-forward drums, short side-chain so fast bass lines keep moving."
+
+# Used for BPM-synced times when tempo detection fails.
+default_bpm: 174
+
+# Target integrated loudness of each role relative to the kick (LU).
+# With several stems sharing a role, the role's *sum* aims at the target.
+targets_lu:
+  kick: 0.0
+  snare_clap: -1.0
+  hats_perc: -8.0
+  sub: -4.0
+  bass: -4.0
+  lead: -7.0
+  pad: -11.0
+  pluck_arp: -9.0
+  vocal: -5.0
+  fx: -13.0
+
+# Kick-triggered ducking. release_beats is in quarter notes (BPM-synced).
+sidechain:
+  attack_ms: 2.0
+  hold_ms: 15.0
+  release_beats: 0.25
+  curve: 2.0
+  # Maximum gain reduction per role (dB); roles not listed are not ducked.
+  depth_db:
+    sub: 6.0
+    bass: 4.0
+    pad: 1.5

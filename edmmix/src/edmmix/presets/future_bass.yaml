@@ -1,0 +1,34 @@
+# Genre preset: future_bass
+name: future_bass
+description: "Future bass: big chord stacks and vocals forward, snare as loud as the kick."
+
+# Used for BPM-synced times when tempo detection fails.
+default_bpm: 150
+
+# Target integrated loudness of each role relative to the kick (LU).
+# With several stems sharing a role, the role's *sum* aims at the target.
+targets_lu:
+  kick: 0.0
+  snare_clap: -1.0
+  hats_perc: -9.0
+  sub: -5.0
+  bass: -5.0
+  lead: -3.0
+  pad: -6.0
+  pluck_arp: -7.0
+  vocal: -2.0
+  fx: -11.0
+
+# Kick-triggered ducking. release_beats is in quarter notes (BPM-synced).
+sidechain:
+  attack_ms: 2.0
+  hold_ms: 15.0
+  release_beats: 0.75
+  curve: 2.0
+  # Maximum gain reduction per role (dB); roles not listed are not ducked.
+  depth_db:
+    sub: 7.0
+    bass: 6.0
+    pad: 5.0
+    lead: 4.0
+    pluck_arp: 3.0
