@@ -5,12 +5,13 @@ parameter dict, so a saved mix_params.json reproduces the mix bit-for-bit.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
 
-from . import analyze, balance, mixbus, params as params_mod, qc, report, stem_processing
+from . import analyze, balance, mixbus, params as params_mod, qc, report, reference, stem_processing
 from .audioio import dequantize24, quantize24, write_wav24
 from .classify import Classifier, classify_stems
 from .dsp import filters
@@ -46,11 +47,32 @@ def check_stems_match(stem_set: StemSet, params: dict) -> None:
         raise params_mod.ParamsError("stems folder does not match mix params (" + "; ".join(parts) + ")")
 
 
-def process_stem(x: np.ndarray, sr: int, sp: dict) -> tuple[np.ndarray, dict]:
+def _strip_reasons(obj):
+    if isinstance(obj, dict):
+        return {k: _strip_reasons(v) for k, v in obj.items() if k != "reason"}
+    if isinstance(obj, list):
+        return [_strip_reasons(v) for v in obj]
+    return obj
+
+
+def process_stem(name: str, x: np.ndarray, sr: int, sp: dict, cache: dict | None = None) -> tuple[np.ndarray, dict]:
     """Per-stem chain that depends on nothing but the stem itself (stage 4, plus the optional
-    phase correction - polarity and delay commute with the rest of this chain)."""
+    phase correction - polarity and delay commute with the rest of this chain).
+
+    ``cache`` lets ``mix`` reuse the audio computed while deciding parameters: the key is
+    the stem name plus every numeric setting of this chain, so a hit is by construction
+    the same computation.
+    """
+    phase_key = _strip_reasons(sp["phase"]) if sp["phase"].get("apply") else None
+    key = (name, json.dumps([_strip_reasons(sp["highpass"]), _strip_reasons(sp["eq"]),
+                             _strip_reasons(sp["compressor"]), phase_key], sort_keys=True))
+    if cache is not None and key in cache:
+        return cache[key]
     y, info = stem_processing.apply(x, sr, sp)
-    return phase.apply(y, sp["phase"]), info
+    result = (phase.apply(y, sp["phase"]), info)
+    if cache is not None:
+        cache[key] = result
+    return result
 
 
 def interact(name: str, procs: dict[str, np.ndarray], params: dict, sr: int) -> tuple[np.ndarray, dict]:
@@ -72,7 +94,7 @@ def apply_bus(x: np.ndarray, bus: dict, sr: int) -> np.ndarray:
     return y * float(from_db(bus.get("gain_db", 0.0)))
 
 
-def render_pre_bus(stem_set: StemSet, params: dict) -> tuple[dict[str, np.ndarray], dict]:
+def render_pre_bus(stem_set: StemSet, params: dict, cache: dict | None = None) -> tuple[dict[str, np.ndarray], dict]:
     """Everything up to (and including) the per-stem balance gain."""
     sr = stem_set.sample_rate
     names = sorted(params["stems"])
@@ -80,7 +102,7 @@ def render_pre_bus(stem_set: StemSet, params: dict) -> tuple[dict[str, np.ndarra
     procs = {}
     for name in names:
         procs[name], info[name]["stem_processing"] = process_stem(
-            f64(stem_set.get(name).audio), sr, params["stems"][name])
+            name, f64(stem_set.get(name).audio), sr, params["stems"][name], cache)
     out = {}
     for name in names:
         y, info[name]["interaction"] = interact(name, procs, params, sr)
@@ -88,11 +110,11 @@ def render_pre_bus(stem_set: StemSet, params: dict) -> tuple[dict[str, np.ndarra
     return out, info
 
 
-def render(stem_set: StemSet, params: dict) -> RenderResult:
+def render(stem_set: StemSet, params: dict, cache: dict | None = None) -> RenderResult:
     params_mod.validate(params)
     check_stems_match(stem_set, params)
     sr = stem_set.sample_rate
-    pre, info = render_pre_bus(stem_set, params)
+    pre, info = render_pre_bus(stem_set, params, cache)
     names = sorted(pre)
     bussed = {n: apply_bus(pre[n], params["buses"][params["stems"][n]["bus"]], sr) for n in names}
     del pre
@@ -144,7 +166,7 @@ def analyze_stem_set(stem_set: StemSet, manual_roles: dict[str, str] | None = No
 
 def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path | None = None,
            manual_roles: dict[str, str] | None = None, bpm_override: float | None = None,
-           classifier: Classifier | None = None) -> tuple[dict, dict]:
+           classifier: Classifier | None = None, cache: dict | None = None) -> tuple[dict, dict]:
     """Analyse the stems and choose every parameter. Returns (params, analysis)."""
     sr = stem_set.sample_rate
     preset = balance.load_preset(genre)
@@ -171,7 +193,7 @@ def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path |
     for name in sorted(roles):
         raw = f64(stem_set.get(name).audio)
         params["stems"][name].update(stem_processing.decide(roles[name], raw, sr, preset))
-        procs[name], _ = process_stem(f64(stem_set.get(name).audio), sr, params["stems"][name])
+        procs[name], _ = process_stem(name, raw, sr, params["stems"][name], cache)
 
     # --- interaction: kick side-chain and phase check
     bpm = float(params["bpm"])
@@ -206,7 +228,11 @@ def decide(stem_set: StemSet, genre: str = "house", reference_path: str | Path |
         params["stems"][name]["dynamic_eq"] = bands
     params["mono_bass"] = mono_bass.decide()
 
+    # --- optional reference matching on the buses
     analysis["reference"] = None
+    if reference_path:
+        pre, _ = render_pre_bus(stem_set, params, cache)
+        params["buses"], analysis["reference"] = reference.decide(pre, params, sr, reference_path)
     return params_mod.validate(params), analysis
 
 
@@ -246,9 +272,10 @@ def write_outputs(out_dir: str | Path, stem_set: StemSet, params: dict, result: 
 def mix(stem_set: StemSet, out_dir: str | Path, genre: str = "house",
         reference_path: str | Path | None = None, manual_roles: dict[str, str] | None = None,
         bpm_override: float | None = None) -> dict:
-    params, analysis = decide(stem_set, genre, reference_path, manual_roles, bpm_override)
+    cache: dict = {}                           # stage-4 audio, reused between decide and render
+    params, analysis = decide(stem_set, genre, reference_path, manual_roles, bpm_override, cache=cache)
     params = params_mod.roundtrip(params)      # render exactly what will be saved
-    result = render(stem_set, params)
+    result = render(stem_set, params, cache)
     return write_outputs(out_dir, stem_set, params, result, analysis, "mix")
 
 
