@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StatementKit — Bank statement PDF to CSV, without uploading it</title>
+  <meta name="description" content="Convert bank statement PDFs to CSV, Excel, QuickBooks, Xero, OFX or QIF. Runs 100% in your browser — your statement never leaves your computer. Every row is checked against the running balance.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230f766e'/%3E%3Cpath d='M9 11h14M9 16h14M9 21h9' stroke='white' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="/"><span class="logo" aria-hidden="true"></span>StatementKit</a>
+    <nav><a href="#how">How it works</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a><span id="pro-badge" class="badge pro" hidden>Pro</span></nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Bank statement PDF → CSV.<br><span>Without uploading it anywhere.</span></h1>
+      <p class="lead">Your statement is parsed <strong>inside this browser tab</strong>. Nothing is sent to a server — and every transaction is checked against the running balance, so you know the numbers are right before they hit your books.</p>
+
+      <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose bank statement PDF files">
+        <input id="file" type="file" accept="application/pdf,.pdf" multiple hidden>
+        <div class="drop-inner">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg>
+          <strong>Drop statement PDFs here</strong>
+          <span>or click to choose · digital PDFs from online banking · stays on your device</span>
+        </div>
+      </div>
+      <p class="trust">🔒 Strict Content-Security-Policy: this page is technically unable to send data to any other site. Check DevTools → Network while you convert, or go offline after the page loads.</p>
+    </section>
+
+    <section id="status" class="status" hidden></section>
+
+    <section id="results" class="results" hidden>
+      <div class="result-head">
+        <div id="verify" class="verify"></div>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="toolbar">
+        <label>Dates <select id="date-order"><option value="auto">Auto-detect</option><option value="DMY">DD/MM</option><option value="MDY">MM/DD</option></select></label>
+        <label>Currency <select id="currency"><option>USD</option><option>GBP</option><option>EUR</option><option>CAD</option><option>AUD</option><option>NZD</option><option>INR</option><option>ZAR</option><option>SGD</option></select></label>
+        <label class="grow">Export as <select id="format"></select></label>
+        <button id="download" class="btn primary">Download</button>
+        <button id="copy" class="btn">Copy table</button>
+      </div>
+      <p class="hint">Click any description or amount to correct it. Rows highlighted in amber didn't match the running balance or had a guessed sign.</p>
+      <div class="table-wrap"><table id="table"><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th><th class="num">Balance</th><th class="file-col">File</th></tr></thead><tbody></tbody></table></div>
+    </section>
+
+    <section id="how" class="how">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li><b>Load</b><span>Your PDF is opened with Mozilla's PDF.js, running in this tab.</span></li>
+        <li><b>Read the layout</b><span>Dates, descriptions and money columns are detected from text positions — Paid in/Paid out, Debit/Credit, signed Amount, or no headers at all.</span></li>
+        <li><b>Verify</b><span>Each row is checked: previous balance + amount = printed balance. Opening + all transactions = closing balance.</span></li>
+        <li><b>Export</b><span>CSV for Excel and Sheets, or import-ready files for QuickBooks, Xero, Quicken and YNAB.</span></li>
+      </ol>
+    </section>
+
+    <section id="pricing" class="pricing">
+      <h2>Pricing</h2>
+      <p class="sub">No subscription. Buy a pass when you need one.</p>
+      <div class="plans">
+        <div class="plan">
+          <h3>Free</h3>
+          <p class="price">$0</p>
+          <ul><li>Unlimited preview &amp; balance check</li><li>CSV export — 1 statement per day</li><li>Up to 3 pages per statement</li></ul>
+        </div>
+        <div class="plan featured">
+          <h3>Pro pass</h3>
+          <p class="price"><span id="price">$9</span> <small>/ <span id="pass-days">30</span> days, no auto-renew</small></p>
+          <ul><li>Unlimited statements &amp; pages</li><li>Batch: drop 12 months at once, merged &amp; sorted</li><li>QuickBooks, Xero, OFX &amp; QIF export</li><li>Still 100% on-device</li></ul>
+          <a id="buy" class="btn primary block" href="#" rel="noopener">Get Pro</a>
+          <form id="key-form" class="key-form">
+            <input id="key-input" placeholder="Paste license key" autocomplete="off" spellcheck="false">
+            <button class="btn" type="submit">Activate</button>
+          </form>
+          <p id="key-msg" class="key-msg"></p>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <h2>FAQ</h2>
+      <details><summary>Is my statement really not uploaded?</summary><p>Correct. Parsing happens in JavaScript in your browser. The server only delivers the page and checks license keys. The page's Content-Security-Policy restricts network connections to this site, and the converter never sends file contents even there. You can load the page, disconnect from the internet, and it still works.</p></details>
+      <details><summary>Which banks are supported?</summary><p>Any digital (text-based) PDF statement with a date per transaction and money columns. That covers most statements downloaded from online banking in the US, UK, EU, Canada and Australia. If one doesn't parse well, the balance check will tell you.</p></details>
+      <details><summary>My PDF is a scan / photo.</summary><p>Scanned statements have no text layer and aren't supported yet. Download the PDF from your online banking instead — it will be digital.</p></details>
+      <details><summary>Password-protected PDFs?</summary><p>Supported. You'll be asked for the password; it's used locally to open the file.</p></details>
+      <details><summary>What does “balance verified” mean?</summary><p>For every row, we check that the previous balance plus the transaction equals the balance printed by your bank. If any row is off — a missed line, a wrong sign — it's highlighted so you can fix it before importing.</p></details>
+      <details><summary>Refunds?</summary><p>If it doesn't work on your statement, email us within 14 days for a full refund.</p></details>
+    </section>
+  </main>
+
+  <footer class="foot">StatementKit · Your data stays on your device · Not affiliated with any bank</footer>
+
+  <dialog id="pw-dialog">
+    <form method="dialog">
+      <p id="pw-label">This PDF is password-protected.</p>
+      <input id="pw-input" type="password" autocomplete="off">
+      <menu><button value="cancel" class="btn">Skip file</button><button value="ok" class="btn primary">Open</button></menu>
+    </form>
+  </dialog>
+</body>
+</html>

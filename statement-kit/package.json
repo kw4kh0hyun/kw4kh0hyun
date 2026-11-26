@@ -1,0 +1,15 @@
+{
+  "name": "statement-kit",
+  "version": "0.1.0",
+  "description": "Convert bank statement PDFs to CSV/OFX/QIF entirely in the browser, with running-balance verification",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "issue-key": "node scripts/issue-key.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": { "pdfjs-dist": "4.10.38" },
+  "devDependencies": { "pdfkit": "0.17.2" },
+  "license": "MIT"
+}
